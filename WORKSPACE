@@ -52,3 +52,9 @@ load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_
 rules_proto_dependencies()
 rules_proto_toolchains()
 
+# External dependency to openvino tensorflow
+new_local_repository(
+        name="openvino_tensorflow",
+        path="/usr/local/lib/python3.7/dist-packages/openvino_tensorflow",
+        build_file="BUILD.ovtf"
+)

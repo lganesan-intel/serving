@@ -1,0 +1,5 @@
+cc_library(
+        name = "openvino_tensorflow",
+        srcs = ["libopenvino_tensorflow.so"],
+        visibility = ["//visibility:public"]
+)

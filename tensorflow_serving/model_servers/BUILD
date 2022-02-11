@@ -408,6 +408,7 @@ cc_binary(
         "//tensorflow_serving:internal",
     ],
     deps = [
+        "@openvino_tensorflow//:openvino_tensorflow",
         ":tensorflow_model_server_main_lib",
     ],
 )
