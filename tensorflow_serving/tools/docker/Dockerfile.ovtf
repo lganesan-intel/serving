@@ -1,0 +1,65 @@
+# Reference: https://github.com/tensorflow/serving/blob/master/tensorflow_serving/tools/docker/Dockerfile
+# Modified dockerfile to include ovtf
+# <Begin change description>
+# Changes to install openvino tensorflow & tensorflow
+# <end>
+
+ARG TF_SERVING_VERSION=latest
+ARG TF_SERVING_BUILD_IMAGE=tensorflow/serving:${TF_SERVING_VERSION}-devel
+
+FROM ${TF_SERVING_BUILD_IMAGE} as build_image
+FROM ubuntu:18.04
+
+ARG TF_SERVING_VERSION_GIT_BRANCH=master
+ARG TF_SERVING_VERSION_GIT_COMMIT=head
+
+LABEL tensorflow_serving_github_branchtag=${TF_SERVING_VERSION_GIT_BRANCH}
+LABEL tensorflow_serving_github_commit=${TF_SERVING_VERSION_GIT_COMMIT}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        python3-minimal \
+        software-properties-common \
+        && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install python 3.7.
+RUN add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update && apt-get install -y \
+    python3.7 python3.7-dev python3-pip python3.7-venv && \
+    rm -rf /var/lib/apt/lists/* && \
+    python3.7 -m pip install pip --upgrade && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.7 0
+    
+# Install TF Serving pkg
+COPY --from=build_image /usr/local/bin/tensorflow_model_server /usr/bin/tensorflow_model_server
+
+# Install OVTF 
+RUN pip3 install tensorflow==2.7.0
+RUN pip3 install openvino_tensorflow
+
+# Expose ports
+# gRPC
+EXPOSE 8500
+
+# REST
+EXPOSE 8501
+
+# Set where models should be stored in the container
+ENV MODEL_BASE_PATH=/models
+RUN mkdir -p ${MODEL_BASE_PATH}
+
+# The only required piece is the model name in order to differentiate endpoints
+ENV MODEL_NAME=model
+
+# Create a script that runs the model server so we can use environment variables
+# while also passing in arguments from the docker command line
+RUN echo '#!/bin/bash \n\n\
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/python3.7/dist-packages/openvino_tensorflow:/usr/local/lib/python3.7/dist-packages/tensorflow \
+tensorflow_model_server --port=8500 --rest_api_port=8501 \
+--model_name=${MODEL_NAME} --model_base_path=${MODEL_BASE_PATH}/${MODEL_NAME} \
+"$@"' > /usr/bin/tf_serving_entrypoint.sh \
+&& chmod +x /usr/bin/tf_serving_entrypoint.sh
+
+ENTRYPOINT ["/usr/bin/tf_serving_entrypoint.sh"]
